@@ -1,0 +1,7 @@
+{
+  "cooldown_period": {
+    "description": "每种表情类别分别计算的冷却秒数，默认 5 秒；奶龙动图与静态图共用冷却",
+    "type": "int",
+    "default": 5
+  }
+}
