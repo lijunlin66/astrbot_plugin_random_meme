@@ -4,7 +4,6 @@ import ast
 import base64
 import importlib.util
 import io
-import logging
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -57,7 +56,7 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
         metadata = yaml.safe_load((root / "metadata.yaml").read_text(encoding="utf-8"))
         self.assertEqual("astrbot_plugin_random_meme", metadata["name"])
         self.assertEqual("lijunlin66", metadata["author"])
-        self.assertEqual("1.0.0", metadata["version"])
+        self.assertEqual("1.0.1", metadata["version"])
         self.assertEqual(
             "https://github.com/lijunlin66/astrbot_plugin_random_meme", metadata["repo"]
         )
@@ -80,7 +79,6 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
         self.plugin.last_called_times = {}
         self.plugin._sticker_urls = {}
         self.plugin.max_retries = 3
-        self.plugin.logger = logging.getLogger("random-meme-tests")
         self.event = FakeEvent()
         self.requests = []
 

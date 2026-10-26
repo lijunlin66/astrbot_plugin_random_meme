@@ -1,5 +1,11 @@
 # 更新日志
 
+## 1.0.1 · 2026-10-26
+
+- 按插件审阅要求，仅从 `astrbot.api` 导入并使用 `logger`。
+- 删除 `main.py` 中内置 `logging` 的导入、日志记录器创建及全部 `self.logger` 调用。
+- 删除测试中不再需要的独立日志记录器，同步版本与安装包说明。
+
 ## 1.0.0 · 2026-10-26
 
 由 lijunlin66 创建并发布 `astrbot_plugin_random_meme`，基于 Shingetsu 的

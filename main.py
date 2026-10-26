@@ -1,6 +1,6 @@
 """Random meme plugin by lijunlin66, based on astrbot_plugin_doro.
 
-Created: 2026-10-26. Version: 1.0.0. License: AGPL-3.0.
+Created: 2026-10-26. Version: 1.0.1. License: AGPL-3.0.
 Original project: https://github.com/2356820887/astrbot_plugin_doro
 Original author: Shingetsu (shingetsu), version 0.0.6.
 Modified and maintained by lijunlin66.
@@ -8,13 +8,12 @@ Modified and maintained by lijunlin66.
 
 import asyncio
 import json
-import logging
 import random
 import time
 from urllib.parse import quote
 
 import httpx
-from astrbot.api import AstrBotConfig
+from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.message_components import Image
 from astrbot.api.star import Context, Star, register
@@ -29,21 +28,20 @@ GALLERY_BASES = {
     "astrbot_plugin_random_meme",
     "lijunlin66",
     "随机获取 Doro、柴郡、龙图及奶龙动静态表情包",
-    "1.0.0",
+    "1.0.1",
 )
 class RandomStickerPlugin(Star):
     """Fetch random stickers with independent cooldowns and bounded retries."""
 
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        self.logger = logging.getLogger(__name__)
         self.cooldown_period = config.get("cooldown_period", 5)
         self.last_called_times = {}
         self._sticker_urls = {}
         self.max_retries = 3
 
     async def initialize(self):
-        self.logger.info("astrbot_plugin_random_meme 1.0.0 initialized")
+        logger.info("astrbot_plugin_random_meme 1.0.1 initialized")
 
     def _is_on_cooldown(self, command_name: str) -> tuple[bool, float]:
         """Check the cooldown for one sticker category.
@@ -126,7 +124,7 @@ class RandomStickerPlugin(Star):
                         self._sticker_urls[command_name] = urls
 
                 if not urls:
-                    self.logger.warning("%s API returned no usable images", entity_name)
+                    logger.warning("%s API returned no usable images", entity_name)
                     self.last_called_times[command_name] = time.time()
                     yield event.plain_result(
                         f"未能从{entity_name} API获取到有效的表情包，请稍后再试。"
@@ -137,7 +135,7 @@ class RandomStickerPlugin(Star):
                 return
 
             except json.JSONDecodeError:
-                self.logger.error("%s API returned invalid JSON", entity_name)
+                logger.error("%s API returned invalid JSON", entity_name)
                 self.last_called_times[command_name] = time.time()
                 yield event.plain_result(
                     f"{entity_name} API返回了无效数据，接口可能已失效，请联系管理员更新。"
@@ -145,13 +143,13 @@ class RandomStickerPlugin(Star):
                 return
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code == 402:
-                    self.logger.warning("%s API is unavailable (402)", entity_name)
+                    logger.warning("%s API is unavailable (402)", entity_name)
                     self.last_called_times[command_name] = time.time()
                     yield event.plain_result(
                         f"{entity_name} API 链接可能正在维护中，请稍后再试。"
                     )
                     return
-                self.logger.warning(
+                logger.warning(
                     "%s API attempt %s failed: %s", entity_name, attempt + 1, exc
                 )
                 if attempt == self.max_retries - 1:
@@ -159,7 +157,7 @@ class RandomStickerPlugin(Star):
                         f"{entity_name} API 请求失败，错误码：{exc.response.status_code}"
                     )
             except httpx.RequestError as exc:
-                self.logger.warning(
+                logger.warning(
                     "%s API attempt %s failed: %s", entity_name, attempt + 1, exc
                 )
                 if attempt == self.max_retries - 1:
@@ -167,7 +165,7 @@ class RandomStickerPlugin(Star):
                         f"请求{entity_name} API失败，请检查网络或API是否可用。"
                     )
             except Exception:
-                self.logger.exception("Unexpected %s sticker error", entity_name)
+                logger.exception("Unexpected %s sticker error", entity_name)
                 self.last_called_times[command_name] = time.time()
                 yield event.plain_result(f"处理{entity_name}请求时发生未知错误。")
                 return
@@ -215,4 +213,4 @@ class RandomStickerPlugin(Star):
             yield result
 
     async def terminate(self):
-        self.logger.info("astrbot_plugin_random_meme terminated")
+        logger.info("astrbot_plugin_random_meme terminated")
