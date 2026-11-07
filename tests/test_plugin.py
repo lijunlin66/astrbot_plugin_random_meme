@@ -6,6 +6,7 @@ import importlib.util
 import io
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -56,7 +57,7 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
         metadata = yaml.safe_load((root / "metadata.yaml").read_text(encoding="utf-8"))
         self.assertEqual("astrbot_plugin_random_meme", metadata["name"])
         self.assertEqual("lijunlin66", metadata["author"])
-        self.assertEqual("1.1.0", metadata["version"])
+        self.assertEqual("1.2.0", metadata["version"])
         self.assertEqual(
             "https://github.com/lijunlin66/astrbot_plugin_random_meme", metadata["repo"]
         )
@@ -72,6 +73,7 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
         self.plugin.config = {"cooldown_period": 5}
         self.plugin.last_called_times = {}
         self.plugin._sticker_urls = {}
+        self.plugin._repo_sticker_names = {}
         self.plugin.max_retries = 3
         self.event = FakeEvent()
         self.requests = []
@@ -224,7 +226,9 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
                     and decorator.func.attr == "command"
                 ):
                     names.append(decorator.args[0].value)
-        self.assertCountEqual(["doro", "柴郡", "龙图", "奶龙", "塔菲"], names)
+        self.assertCountEqual(
+            ["doro", "柴郡", "龙图", "奶龙", "塔菲", "牢大", "呆猫"], names
+        )
         self.assertFalse(hasattr(self.plugin, "cheshire"))
         self.assertFalse(hasattr(self.plugin, "nailong_gif"))
         self.assertFalse(hasattr(self.plugin, "nailong_image"))
@@ -331,37 +335,104 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("plain", results[0][0][0])
         self.assertIn("未能", results[0][0][1])
 
-    async def test_taffy_retries_distinct_images_and_has_separate_cooldown(self):
-        urls = module.TAFFY_URLS
-        self.assertGreaterEqual(len(urls), 100)
-        self.assertEqual(len(urls), len(set(urls)))
+    async def test_taffy_fetches_one_gif_from_github_and_has_separate_cooldown(self):
         image = io.BytesIO()
         frames = [Image.new("RGB", (8, 8), color) for color in ("red", "blue")]
         frames[0].save(image, format="GIF", save_all=True, append_images=frames[1:])
         payload = image.getvalue()
         self.plugin.last_called_times["奶龙"] = module.time.time()
+        name = "002-永雏塔菲表情包.gif"
+        with TemporaryDirectory() as directory:
+            self.plugin.repo_dir = Path(directory)
+            first, second = await self.run_command(
+                [
+                    httpx.Response(
+                        200,
+                        json=[
+                            {"name": name, "type": "file"},
+                            {"name": "folder.gif", "type": "dir"},
+                            {"name": "static.png", "type": "file"},
+                            {"name": "../invalid.gif", "type": "file"},
+                        ],
+                    ),
+                    httpx.Response(200, content=payload),
+                ],
+                command="taffy",
+                calls=2,
+                reset_cooldown=False,
+            )
 
-        results = await self.run_command(
-            [
-                httpx.Response(404),
-                httpx.Response(200, text="<html>Unavailable</html>"),
-                httpx.Response(
-                    200, content=payload, headers={"content-type": "image/gif"}
-                ),
-            ],
-            command="taffy",
-            calls=2,
-            reset_cooldown=False,
+        self.assertEqual(2, len(self.requests))
+        self.assertEqual("api.github.com", self.requests[0].url.host)
+        self.assertEqual(
+            "/repos/lijunlin66/taffy_meme/contents/taffy", self.requests[0].url.path
         )
-
-        requested = {str(request.url) for request in self.requests}
-        self.assertEqual(3, len(self.requests))
-        self.assertEqual(3, len(requested))
-        self.assertTrue(requested.issubset(urls))
-        self.assertEqual(1, len(results[0]))
-        kind, chain = results[0][0]
+        self.assertEqual(module.MEME_REPO_REVISION, self.requests[0].url.params["ref"])
+        self.assertTrue(self.requests[1].url.path.endswith("/" + name))
+        self.assertEqual(
+            "application/vnd.github.raw+json", self.requests[1].headers["Accept"]
+        )
+        self.assertEqual(1, len(first))
+        kind, chain = first[0]
         self.assertEqual("chain", kind)
         self.assertEqual(1, len(chain))
         self.assertEqual(payload, base64.b64decode(chain[0].file.split("//", 1)[1]))
-        self.assertIn("请稍等", results[1][0][1])
+        self.assertIn("请稍等", second[0][1])
         self.assertEqual({"奶龙", "塔菲"}, self.plugin.last_called_times.keys())
+
+    async def test_taffy_uses_local_snapshot_when_github_is_unavailable(self):
+        image = io.BytesIO()
+        Image.new("RGB", (8, 8), "red").save(image, format="GIF")
+        payload = image.getvalue()
+        with TemporaryDirectory() as directory:
+            self.plugin.repo_dir = Path(directory)
+            gallery = self.plugin.repo_dir / "taffy"
+            gallery.mkdir()
+            (gallery / "single-frame.gif").write_bytes(payload)
+            results = await self.run_command([httpx.Response(403)], command="taffy")
+        self.assertEqual(1, len(self.requests))
+        kind, chain = results[0][0]
+        self.assertEqual("chain", kind)
+        self.assertEqual(payload, base64.b64decode(chain[0].file.split("//", 1)[1]))
+
+    async def test_taffy_handles_a_missing_gallery(self):
+        with TemporaryDirectory() as directory:
+            self.plugin.repo_dir = Path(directory)
+            results = await self.run_command([httpx.Response(503)], command="taffy")
+        self.assertEqual("plain", results[0][0][0])
+        self.assertIn("暂无可用图片", results[0][0][1])
+
+    async def test_new_galleries_have_separate_catalogues_and_cooldowns(self):
+        with TemporaryDirectory() as directory:
+            self.plugin.repo_dir = Path(directory)
+            for handler, folder, color in [
+                ("laoda", "牢大", "red"),
+                ("daimao", "呆猫", "blue"),
+            ]:
+                name = f"{folder}.gif"
+                image = io.BytesIO()
+                Image.new("RGB", (8, 8), color).save(image, format="GIF")
+                payload = image.getvalue()
+                first, second = await self.run_command(
+                    [
+                        httpx.Response(200, json=[{"name": name, "type": "file"}]),
+                        httpx.Response(200, content=payload),
+                    ],
+                    command=handler,
+                    calls=2,
+                    reset_cooldown=False,
+                )
+                kind, chain = first[0]
+                self.assertEqual("chain", kind)
+                self.assertEqual(
+                    payload, base64.b64decode(chain[0].file.split("//", 1)[1])
+                )
+                self.assertIn("请稍等", second[0][1])
+                self.assertTrue(self.requests[-2].url.path.endswith(f"/{folder}"))
+                self.assertTrue(
+                    self.requests[-1].url.path.endswith(f"/{folder}/{name}")
+                )
+                self.assertEqual([name], self.plugin._repo_sticker_names[folder])
+
+        self.assertEqual(4, len(self.requests))
+        self.assertEqual({"牢大", "呆猫"}, self.plugin.last_called_times.keys())
