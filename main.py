@@ -1,6 +1,6 @@
 """Random meme plugin by lijunlin66, based on astrbot_plugin_doro.
 
-Created: 2026-10-26. Version: 1.0.1. License: AGPL-3.0.
+Created: 2026-10-26. License: AGPL-3.0.
 Original project: https://github.com/2356820887/astrbot_plugin_doro
 Original author: Shingetsu (shingetsu), version 0.0.6.
 Modified and maintained by lijunlin66.
@@ -10,38 +10,33 @@ import asyncio
 import json
 import random
 import time
+from pathlib import Path
 from urllib.parse import quote
 
 import httpx
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.message_components import Image
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star
 
 GALLERY_BASES = {
     "doro": "https://cdn.jsdmirror.com/gh/1143520/doro@main/",
     "奶龙": "https://cdn.jsdmirror.com/gh/GeorgeNaNN/nailong-memes@main/",
 }
-
-
-@register(
-    "astrbot_plugin_random_meme",
-    "lijunlin66",
-    "随机获取 Doro、柴郡、龙图及奶龙动静态表情包",
-    "1.0.1",
+TAFFY_URLS = tuple(
+    Path(__file__).with_name("taffy_urls.txt").read_text(encoding="utf-8").splitlines()
 )
+
+
 class RandomStickerPlugin(Star):
     """Fetch random stickers with independent cooldowns and bounded retries."""
 
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        self.cooldown_period = config.get("cooldown_period", 5)
+        self.config = config
         self.last_called_times = {}
         self._sticker_urls = {}
         self.max_retries = 3
-
-    async def initialize(self):
-        logger.info("astrbot_plugin_random_meme 1.0.1 initialized")
 
     def _is_on_cooldown(self, command_name: str) -> tuple[bool, float]:
         """Check the cooldown for one sticker category.
@@ -53,18 +48,22 @@ class RandomStickerPlugin(Star):
             Whether the category is cooling down and the remaining seconds.
         """
         elapsed = time.time() - self.last_called_times.get(command_name, 0)
-        remaining = max(0, self.cooldown_period - elapsed)
+        remaining = max(0, self.config.get("cooldown_period", 5) - elapsed)
         return remaining > 0, remaining
 
     async def _get_random_sticker(
-        self, event: AstrMessageEvent, command_name: str, api_url: str, entity_name: str
+        self,
+        event: AstrMessageEvent,
+        command_name: str,
+        source: str | tuple[str, ...],
+        entity_name: str,
     ):
         """Fetch an image or gallery entry and construct one reply.
 
         Args:
             event: Incoming event used to construct the reply.
             command_name: Category used for cooldowns and gallery caching.
-            api_url: Image endpoint or GitHub gallery endpoint.
+            source: API endpoint or a bundled list of direct image URLs.
             entity_name: Category name displayed in user messages.
 
         Yields:
@@ -77,14 +76,20 @@ class RandomStickerPlugin(Star):
             )
             return
 
-        for attempt in range(self.max_retries):
+        direct_gallery = isinstance(source, tuple)
+        if direct_gallery:
+            candidates = random.sample(source, min(self.max_retries, len(source)))
+        else:
+            candidates = [source] * self.max_retries
+
+        for attempt, url in enumerate(candidates, start=1):
             try:
                 urls = self._sticker_urls.get(command_name, [])
                 if not urls:
                     async with httpx.AsyncClient(
                         timeout=15, follow_redirects=True
                     ) as client:
-                        response = await client.get(api_url)
+                        response = await client.get(url)
                         response.raise_for_status()
                     if response.headers.get("content-type", "").startswith("image/"):
                         if not response.content:
@@ -94,6 +99,11 @@ class RandomStickerPlugin(Star):
                         self.last_called_times[command_name] = time.time()
                         yield event.chain_result([Image.fromBytes(response.content)])
                         return
+
+                    if direct_gallery:
+                        raise httpx.RequestError(
+                            "Expected an image response", request=response.request
+                        )
 
                     data = response.json()
                     if command_name == "奶龙" and isinstance(data, dict):
@@ -142,7 +152,7 @@ class RandomStickerPlugin(Star):
                 )
                 return
             except httpx.HTTPStatusError as exc:
-                if exc.response.status_code == 402:
+                if exc.response.status_code == 402 and not direct_gallery:
                     logger.warning("%s API is unavailable (402)", entity_name)
                     self.last_called_times[command_name] = time.time()
                     yield event.plain_result(
@@ -150,17 +160,17 @@ class RandomStickerPlugin(Star):
                     )
                     return
                 logger.warning(
-                    "%s API attempt %s failed: %s", entity_name, attempt + 1, exc
+                    "%s API attempt %s failed: %s", entity_name, attempt, exc
                 )
-                if attempt == self.max_retries - 1:
+                if attempt == len(candidates):
                     yield event.plain_result(
                         f"{entity_name} API 请求失败，错误码：{exc.response.status_code}"
                     )
             except httpx.RequestError as exc:
                 logger.warning(
-                    "%s API attempt %s failed: %s", entity_name, attempt + 1, exc
+                    "%s API attempt %s failed: %s", entity_name, attempt, exc
                 )
-                if attempt == self.max_retries - 1:
+                if attempt == len(candidates):
                     yield event.plain_result(
                         f"请求{entity_name} API失败，请检查网络或API是否可用。"
                     )
@@ -170,8 +180,8 @@ class RandomStickerPlugin(Star):
                 yield event.plain_result(f"处理{entity_name}请求时发生未知错误。")
                 return
 
-            if attempt < self.max_retries - 1:
-                await asyncio.sleep(2**attempt)
+            if attempt < len(candidates):
+                await asyncio.sleep(2 ** (attempt - 1))
         self.last_called_times[command_name] = time.time()
 
     @filter.command("doro")
@@ -212,5 +222,10 @@ class RandomStickerPlugin(Star):
         ):
             yield result
 
-    async def terminate(self):
-        logger.info("astrbot_plugin_random_meme terminated")
+    @filter.command("塔菲")
+    async def taffy(self, event: AstrMessageEvent):
+        """随机获取一张永雏塔菲表情包。"""
+        async for result in self._get_random_sticker(
+            event, "塔菲", TAFFY_URLS, "永雏塔菲"
+        ):
+            yield result

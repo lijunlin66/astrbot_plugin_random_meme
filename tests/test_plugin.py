@@ -56,16 +56,10 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
         metadata = yaml.safe_load((root / "metadata.yaml").read_text(encoding="utf-8"))
         self.assertEqual("astrbot_plugin_random_meme", metadata["name"])
         self.assertEqual("lijunlin66", metadata["author"])
-        self.assertEqual("1.0.1", metadata["version"])
+        self.assertEqual("1.1.0", metadata["version"])
         self.assertEqual(
             "https://github.com/lijunlin66/astrbot_plugin_random_meme", metadata["repo"]
         )
-        tree = ast.parse(PLUGIN_PATH.read_text(encoding="utf-8"))
-        plugin = next(node for node in tree.body if isinstance(node, ast.ClassDef))
-        registration = plugin.decorator_list[0]
-        self.assertEqual(metadata["name"], registration.args[0].value)
-        self.assertEqual(metadata["author"], registration.args[1].value)
-        self.assertEqual(metadata["version"], registration.args[3].value)
         self.assertIn(
             "astrbot_plugin_doro", (root / "ATTRIBUTION.md").read_text(encoding="utf-8")
         )
@@ -75,7 +69,7 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         self.plugin = module.RandomStickerPlugin.__new__(module.RandomStickerPlugin)
-        self.plugin.cooldown_period = 5
+        self.plugin.config = {"cooldown_period": 5}
         self.plugin.last_called_times = {}
         self.plugin._sticker_urls = {}
         self.plugin.max_retries = 3
@@ -218,7 +212,7 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("请稍等", results[0][1])
 
     def test_public_commands_and_removed_legacy_command(self):
-        tree = ast.parse(PLUGIN_PATH.read_text())
+        tree = ast.parse(PLUGIN_PATH.read_text(encoding="utf-8"))
         names = []
         for node in ast.walk(tree):
             if not isinstance(node, ast.AsyncFunctionDef):
@@ -230,7 +224,7 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
                     and decorator.func.attr == "command"
                 ):
                     names.append(decorator.args[0].value)
-        self.assertCountEqual(["doro", "柴郡", "龙图", "奶龙"], names)
+        self.assertCountEqual(["doro", "柴郡", "龙图", "奶龙", "塔菲"], names)
         self.assertFalse(hasattr(self.plugin, "cheshire"))
         self.assertFalse(hasattr(self.plugin, "nailong_gif"))
         self.assertFalse(hasattr(self.plugin, "nailong_image"))
@@ -336,3 +330,38 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual("plain", results[0][0][0])
         self.assertIn("未能", results[0][0][1])
+
+    async def test_taffy_retries_distinct_images_and_has_separate_cooldown(self):
+        urls = module.TAFFY_URLS
+        self.assertGreaterEqual(len(urls), 100)
+        self.assertEqual(len(urls), len(set(urls)))
+        image = io.BytesIO()
+        frames = [Image.new("RGB", (8, 8), color) for color in ("red", "blue")]
+        frames[0].save(image, format="GIF", save_all=True, append_images=frames[1:])
+        payload = image.getvalue()
+        self.plugin.last_called_times["奶龙"] = module.time.time()
+
+        results = await self.run_command(
+            [
+                httpx.Response(404),
+                httpx.Response(200, text="<html>Unavailable</html>"),
+                httpx.Response(
+                    200, content=payload, headers={"content-type": "image/gif"}
+                ),
+            ],
+            command="taffy",
+            calls=2,
+            reset_cooldown=False,
+        )
+
+        requested = {str(request.url) for request in self.requests}
+        self.assertEqual(3, len(self.requests))
+        self.assertEqual(3, len(requested))
+        self.assertTrue(requested.issubset(urls))
+        self.assertEqual(1, len(results[0]))
+        kind, chain = results[0][0]
+        self.assertEqual("chain", kind)
+        self.assertEqual(1, len(chain))
+        self.assertEqual(payload, base64.b64decode(chain[0].file.split("//", 1)[1]))
+        self.assertIn("请稍等", results[1][0][1])
+        self.assertEqual({"奶龙", "塔菲"}, self.plugin.last_called_times.keys())

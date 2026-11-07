@@ -20,7 +20,7 @@
 - [LICENSE](LICENSE) 保留上游许可证全文，不改变原项目的版权归属。
 
 本项目沿用并修改了上游的命令事件处理、按类别冷却、异步请求和重试思路，
-修复失效来源并扩展至四类表情。新增与修改部分由 lijunlin66 维护，
+修复失效来源并扩展至五类表情。新增与修改部分由 lijunlin66 维护，
 同样采用 AGPL-3.0。上述创建时间指本派生仓库，与上游项目的创建时间无关。
 
 ## 图片及服务
@@ -29,6 +29,7 @@
 - 奶龙图库：[GeorgeNaNN/nailong-memes](https://github.com/GeorgeNaNN/nailong-memes)
 - 柴郡图片接口：[HL](https://hlz7.com/blog/s9b7f22i/)
 - 龙图接口：[OIAPI](https://oiapi.net)
+- 永雏塔菲图库：[檀夕二的表情包合集](https://www.bilibili.com/opus/905451613661954053)、[永雏塔菲的 35 张表情配布](https://www.bilibili.com/opus/648285615126740998)与[动态表情](https://www.bilibili.com/opus/1100510435334946854)
 - GitHub 图片 CDN：[JSDMirror](https://www.jsdmirror.com/)
 - 图标：由 lijunlin66 指定提供的图片，以 PNG 格式随插件分发。
 

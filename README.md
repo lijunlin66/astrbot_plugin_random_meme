@@ -2,8 +2,7 @@
 
 <img src="logo.png" alt="随机表情包插件图标" width="160" height="160">
 
-由 **lijunlin66** 创建并维护的 AstrBot 随机表情包插件，支持 Doro、柴郡、龙图，
-以及奶龙 GIF 与静态图混合随机获取。每次命令发送一张图片。
+由 **lijunlin66** 创建并维护的 AstrBot 随机表情包插件，支持 Doro、柴郡、龙图、奶龙和永雏塔菲。每次命令发送一张图片。
 
 **基于 [astrbot_plugin_doro](https://github.com/2356820887/astrbot_plugin_doro)
 0.0.6 二次开发**，原作者为 Shingetsu（shingetsu）。上游归属及许可证保留，
@@ -15,7 +14,7 @@
 | 展示名称 | 随机表情包 |
 | 作者 / 维护者 | [lijunlin66](https://github.com/lijunlin66) |
 | 创建日期 | 2026-10-26（Asia/Shanghai） |
-| 当前版本 | `1.0.1` |
+| 当前版本 | `1.1.0` |
 | 仓库 | [lijunlin66/astrbot_plugin_random_meme](https://github.com/lijunlin66/astrbot_plugin_random_meme) |
 | AstrBot 版本 | `>=4.29.1,<5`，已在 4.29.1 验证 |
 | 已验证平台 | OneBot v11 / `aiocqhttp`，支持群聊和私聊 |
@@ -39,7 +38,7 @@ https://github.com/lijunlin66/astrbot_plugin_random_meme
 ### 从 ZIP 安装
 
 可以在 GitHub 页面选择 **Code → Download ZIP**，然后通过 AstrBot 的本地插件
-上传功能安装；也可上传随本次发布提供的 `astrbot_plugin_random_meme-1.0.1.zip`。
+上传功能安装；也可上传随本次发布提供的 `astrbot_plugin_random_meme-1.1.0.zip`。
 
 ### 从旧插件迁移
 
@@ -55,12 +54,11 @@ https://github.com/lijunlin66/astrbot_plugin_random_meme
 | `/柴郡` | 随机获取一张柴郡表情包 |
 | `/龙图` | 随机获取一张龙图表情包 |
 | `/奶龙` | 从奶龙 GIF 和静态图的合并清单中随机获取一张 |
+| `/塔菲` | 从 144 张永雏塔菲表情包中随机获取一张，包含静态图和 GIF |
 
 奶龙会同时读取仓库 `gif/`、`images/` 两个目录。目前清单为 83 张 GIF 与
 62 张静态图，共 145 张；上游图库更新后数量会变化。每次对合并清单直接
 等概率抽取，每张图片的抽中概率相同。它使用同一个命令、冷却和缓存。
-
-本插件仅注册上述四条命令。
 
 ## 配置
 
@@ -68,8 +66,7 @@ https://github.com/lijunlin66/astrbot_plugin_random_meme
 | --- | --- | --- | --- |
 | `cooldown_period` | 整数 | `5` | 每个类别的冷却秒数；填 `0` 可关闭冷却 |
 
-冷却按类别在整个插件内共享，不按用户或群单独计算。四类表情分别计时，
-奶龙 GIF 和静态图共同计入奶龙类别；失败也会进入对应冷却，避免连续请求异常接口。
+冷却在整个插件内按类别计时。同一类别的静态图和 GIF 共用冷却。失败也会进入对应冷却，避免连续请求异常接口。
 
 ## 图片来源与请求方式
 
@@ -79,6 +76,7 @@ https://github.com/lijunlin66/astrbot_plugin_random_meme
 | 柴郡 | [HL 柴郡接口](https://api.hlz7.com/chajun) | 直接下载随机图片 |
 | 龙图 | [OIAPI 随机表情包](https://oiapi.net/api/FunBoxEmoji?0=dragon) | 按龙图分类下载随机图片 |
 | 奶龙 | [GeorgeNaNN/nailong-memes](https://github.com/GeorgeNaNN/nailong-memes) | 合并 `gif/`、`images/` 后随机选择 |
+| 永雏塔菲 | [檀夕二的合集](https://www.bilibili.com/opus/905451613661954053)、[永雏塔菲的配布](https://www.bilibili.com/opus/648285615126740998)与[动态表情](https://www.bilibili.com/opus/1100510435334946854) | 从随插件附带的链接清单抽取，直接下载原图。遇到失效链接时换图重试 |
 
 Doro 和奶龙的清单分别缓存在内存中，重载插件后重新获取。GitHub 图片通过
 `cdn.jsdmirror.com` 下载；奶龙会检查目录树是否完整，避免使用被截断的清单。
@@ -91,7 +89,9 @@ Doro 和奶龙的清单分别缓存在内存中，重载插件后重新获取。
 
 ```text
 astrbot_plugin_random_meme/
-├── main.py                # 插件入口与四条命令
+├── __init__.py
+├── main.py                # 插件入口与五条命令
+├── taffy_urls.txt         # 永雏塔菲原图链接
 ├── metadata.yaml          # 插件名称、作者、版本与仓库
 ├── _conf_schema.json      # 冷却配置
 ├── logo.png               # 维护者指定的图标
