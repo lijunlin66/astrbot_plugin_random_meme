@@ -57,7 +57,7 @@ class RandomMemeTests(unittest.IsolatedAsyncioTestCase):
         metadata = yaml.safe_load((root / "metadata.yaml").read_text(encoding="utf-8"))
         self.assertEqual("astrbot_plugin_random_meme", metadata["name"])
         self.assertEqual("lijunlin66", metadata["author"])
-        self.assertEqual("1.2.0", metadata["version"])
+        self.assertEqual("1.2.1", metadata["version"])
         self.assertEqual(
             "https://github.com/lijunlin66/astrbot_plugin_random_meme", metadata["repo"]
         )

@@ -1,6 +1,7 @@
 {
   "cooldown_period": {
-    "description": "每种表情类别分别计算的冷却秒数，默认 5 秒；奶龙动图与静态图共用冷却",
+    "description": "分类冷却（秒）",
+    "hint": "每类表情单独计时。默认 5 秒，设为 0 可关闭。奶龙动图与静态图共用冷却。",
     "type": "int",
     "default": 5
   }

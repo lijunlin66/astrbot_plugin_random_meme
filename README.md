@@ -14,7 +14,7 @@
 | 展示名称 | 随机表情包 |
 | 作者 / 维护者 | [lijunlin66](https://github.com/lijunlin66) |
 | 创建日期 | 2026-10-26（Asia/Shanghai） |
-| 当前版本 | `1.2.0` |
+| 当前版本 | `1.2.1` |
 | 仓库 | [lijunlin66/astrbot_plugin_random_meme](https://github.com/lijunlin66/astrbot_plugin_random_meme) |
 | AstrBot 版本 | `>=4.29.1,<5`，已在 4.29.1 验证 |
 | 已验证平台 | OneBot v11 / `aiocqhttp`，支持群聊和私聊 |

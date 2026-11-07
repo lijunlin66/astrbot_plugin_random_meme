@@ -1,7 +1,7 @@
 name: astrbot_plugin_random_meme
 display_name: 随机表情包
 desc: 随机获取 Doro、柴郡、龙图、奶龙、永雏塔菲、科比牢大和怪猎呆猫表情包。基于 astrbot_plugin_doro 二次开发。
-version: 1.2.0
+version: 1.2.1
 author: lijunlin66
 repo: https://github.com/lijunlin66/astrbot_plugin_random_meme
 astrbot_version: ">=4.29.1,<5"
